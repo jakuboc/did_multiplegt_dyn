@@ -4942,10 +4942,9 @@ gegen N`=increase_XX'_t_`i'_XX = total(distance_to_switch_`i'_wXX) ///
 scalar N`=increase_XX'_`i'_XX =0
 
 // Loop over t incrementing the scalar
-forvalue t=`=t_min_XX'/`=T_max_XX'{
-	sum N`=increase_XX'_t_`i'_XX if time_XX==`t'
-	if !missing(r(mean)) scalar N`=increase_XX'_`i'_XX = N`=increase_XX'_`i'_XX + r(mean)
-}
+* Sum one stored total per time period in Mata.
+mata: _didmgt_dyn_time_total("N`=increase_XX'_t_`i'_XX", ///
+        "N`=increase_XX'_`i'_XX")
 
 // Modif Felix weight
 if "`weight'"!=""{
@@ -4956,10 +4955,9 @@ if "`weight'"!=""{
 	scalar N`=increase_XX'_`i'_XX_weight =0
 
 // Loop over t incrementing the scalar
-forvalue t=`=t_min_XX'/`=T_max_XX'{
-	sum N`=increase_XX'_t_`i'_XX_w if time_XX==`t'
-	if !missing(r(mean)) scalar N`=increase_XX'_`i'_XX_weight = N`=increase_XX'_`i'_XX_weight + r(mean)
-}
+* Sum one stored total per time period in Mata.
+mata: _didmgt_dyn_time_total("N`=increase_XX'_t_`i'_XX_w", ///
+        "N`=increase_XX'_`i'_XX_weight")
 }
 
 ///// Creating N^1_{t,\ell,g}/N^0_{t,\ell,g}: 
@@ -5576,10 +5574,9 @@ gegen N`=increase_XX'_t_placebo_`i'_XX = total(dist_to_switch_pl_`i'_wXX) ///
 scalar N`=increase_XX'_placebo_`i'_XX=0
 
 // Loop over t incrementing the scalar
-forvalue t=`=t_min_XX'/`=T_max_XX'{
-	sum N`=increase_XX'_t_placebo_`i'_XX if time_XX==`t'
-	if !missing(r(mean)) scalar N`=increase_XX'_placebo_`i'_XX = N`=increase_XX'_placebo_`i'_XX + r(mean) // Modif Diego
-}
+* Sum one stored total per time period in Mata.
+mata: _didmgt_dyn_time_total("N`=increase_XX'_t_placebo_`i'_XX", ///
+        "N`=increase_XX'_placebo_`i'_XX")
 
 // Modif Felix weight
 if "`weight'"!=""{
@@ -5591,10 +5588,9 @@ if "`weight'"!=""{
 	scalar N`=increase_XX'_`i'_pl_XX_weight=0
 
 // Loop over t incrementing the scalar
-forvalue t=`=t_min_XX'/`=T_max_XX'{
-	sum N`=increase_XX'_t_pl_`i'_XX_w if time_XX==`t'
-	if !missing(r(mean)) scalar N`=increase_XX'_`i'_pl_XX_weight = N`=increase_XX'_`i'_pl_XX_weight + r(mean) // Modif Diego
-}
+* Sum one stored total per time period in Mata.
+mata: _didmgt_dyn_time_total("N`=increase_XX'_t_pl_`i'_XX_w", ///
+        "N`=increase_XX'_`i'_pl_XX_weight")
 }
 
 ///// Creating N^1_{t,\ell,g}/N^0_{t,\ell,g} for the placebos: 
@@ -6001,3 +5997,35 @@ bys group_XX : gen U_Gg_var_XX = U_Gg_num_var_XX/U_Gg_den_XX
 end
 
 
+
+capture mata: mata drop _didmgt_dyn_time_total()
+
+version 12.0
+mata:
+void _didmgt_dyn_time_total(string scalar variable, string scalar target)
+{
+        real matrix data, panels
+        real scalar i, total, lower, upper, value
+
+        /*
+        Each time period contains an identical stored total. Sort only
+        these two columns, visit one observation per period, and retain
+        the original ascending-time accumulation order.
+        */
+        data = sort(st_data(., ("time_XX", variable)), 1)
+        panels = panelsetup(data, 1)
+        total = 0
+        lower = st_numscalar("t_min_XX")
+        upper = st_numscalar("T_max_XX")
+
+        for (i = 1; i <= rows(panels); i++) {
+                if (data[panels[i, 1], 1] < lower |
+                    data[panels[i, 1], 1] > upper) continue
+
+                value = data[panels[i, 1], 2]
+                if (value < .) total = total + value
+        }
+
+        st_numscalar(target, total)
+}
+end
