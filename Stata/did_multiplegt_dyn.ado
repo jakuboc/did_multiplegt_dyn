@@ -563,7 +563,8 @@ drop if `2'==.|`3'==.
 capture drop counter_XX
 capture drop counter_temp_XX
 gen counter_temp_XX=1
-bys `2' `3' : gegen counter_XX=count(counter_temp_XX)
+gegen counter_XX = count(counter_temp_XX) ///
+        , by(`2' `3')
 sum counter_XX
 scalar aggregated_data=0
 if r(max)==1{
@@ -659,8 +660,10 @@ if "``by'_has_vallabel_XX'"=="."{
 //dropping groups with always missing treatment or outcome
 capture drop mean_d_XX
 capture drop mean_y_XX
-bys `2': gegen mean_d_XX=mean(`4')
-bys `2': gegen mean_y_XX=mean(`1')
+gegen mean_d_XX = mean(`4') ///
+        , by(`2')
+gegen mean_y_XX = mean(`1') ///
+        , by(`2')
 drop if mean_d_XX==.|mean_y_XX==.
 drop mean_d_XX mean_y_XX
 
@@ -789,7 +792,8 @@ if `reset'!=0 {
 	//// Balancing panel to all complete treatment paths
 
 	gen count_d_non_miss_temp_XX=(treatment_XX!=.)
-	bys group_XX: gegen count_d_non_miss_XX=sum(count_d_non_miss_temp_XX)
+        gegen count_d_non_miss_XX=sum(count_d_non_miss_temp_XX) ///
+                , by(group_XX)
 	sum count_d_non_miss_XX
 	drop if count_d_non_miss_XX<r(max)
 
@@ -841,23 +845,27 @@ if `reset'!=0 {
 // G's first and last date when D not missing
 
 gen time_d_nonmiss_XX=time_XX if treatment_XX!=.
-bys group_XX: gegen min_time_d_nonmiss_XX=min(time_d_nonmiss_XX)
+gegen min_time_d_nonmiss_XX = min(time_d_nonmiss_XX) ///
+        , by(group_XX)
 capture drop max_time_d_nonmiss_XX
-bys group_XX: gegen max_time_d_nonmiss_XX=max(time_d_nonmiss_XX)
+gegen max_time_d_nonmiss_XX = max(time_d_nonmiss_XX) ///
+        , by(group_XX)
 
 // G's first date when Y not missing
 
 capture drop time_y_nonmiss_XX
 capture drop min_time_y_nonmiss_XX
 gen time_y_nonmiss_XX=time_XX if outcome_XX!=.
-bys group_XX: gegen min_time_y_nonmiss_XX=min(time_y_nonmiss_XX)
+gegen min_time_y_nonmiss_XX = min(time_y_nonmiss_XX) ///
+        , by(group_XX)
 
 // G's first date when D missing after Y has been not missing
 
 capture drop time_d_miss_XX
 capture drop min_time_d_miss_aft_ynm_XX
 gen time_d_miss_XX=time_XX if treatment_XX==.&time_XX>=min_time_y_nonmiss_XX
-bys group_XX: gegen min_time_d_miss_aft_ynm_XX=min(time_d_miss_XX)
+gegen min_time_d_miss_aft_ynm_XX = min(time_d_miss_XX) ///
+        , by(group_XX)
 drop time_d_nonmiss_XX time_y_nonmiss_XX time_d_miss_XX 
 
 ///// Creating baseline treatment
@@ -865,7 +873,8 @@ drop time_d_nonmiss_XX time_y_nonmiss_XX time_d_miss_XX
 ///// g's treatment at first period where g's treatment non missing
 
 gen d_sq_XX_temp=treatment_XX if time_XX==min_time_d_nonmiss_XX
-bys group_XX: gegen d_sq_XX=mean(d_sq_XX_temp)
+gegen d_sq_XX = mean(d_sq_XX_temp) ///
+        , by(group_XX)
 drop d_sq_XX_temp 
 
 ///// Enforcing Design Restriction 2 in the paper.
@@ -904,7 +913,8 @@ replace ever_change_d_XX=1 if ever_change_d_XX[_n-1]==1&group_XX==group_XX[_n-1]
 sort group_XX time_XX
 gen temp_F_g_XX=time_XX if ever_change_d_XX==1&ever_change_d_XX[_n-1]==0 
 replace temp_F_g_XX=0 if temp_F_g_XX==.
-bys group_XX: gegen F_g_XX=max(temp_F_g_XX)
+gegen F_g_XX = max(temp_F_g_XX) ///
+        , by(group_XX)
 drop temp_F_g_XX
 
 ///// If continuous option specified, generating polynomials of D_{g,1},
@@ -930,7 +940,8 @@ gegen d_sq_int_XX = group(d_sq_XX)
 
 ///// Dropping the values of the baseline treatment such that no variance in F_g within those values.
 capture drop var_F_g_XX
-bys d_sq_XX `trends_nonparam': gegen var_F_g_XX=sd(F_g_XX)
+gegen var_F_g_XX = sd(F_g_XX) ///
+        , by(d_sq_XX `trends_nonparam')
 drop if var_F_g_XX==0
 drop var_F_g_XX
 
@@ -955,7 +966,8 @@ if r(N)==0{
 ///// For each value of the baseline treatment, we drop time periods such that we do not have any control with that baseline treatment after that period
 ///// This means the panel is no longer balanced, though it is balanced within values of the baseline treatment
 gen never_change_d_XX=1-ever_change_d_XX
-bys time_XX d_sq_XX `trends_nonparam': gegen controls_time_XX=max(never_change_d_XX)
+gegen controls_time_XX = max(never_change_d_XX) ///
+        , by(time_XX d_sq_XX `trends_nonparam')
 drop if controls_time_XX==0
 
 ///// Computing t_min_XX, T_max_XX, and replacing F_g_XX by last period plus one for those that never change treatment
@@ -981,7 +993,8 @@ replace outcome_XX=. if min_time_d_miss_aft_ynm_XX<F_g_XX&time_XX>=min_time_d_mi
 capture drop last_obs_D_bef_switch_t_XX
 capture drop last_obs_D_bef_switch_XX
 gen last_obs_D_bef_switch_t_XX=time_XX if time_XX<F_g_XX&treatment_XX!=.
-bys group_XX: gegen last_obs_D_bef_switch_XX=max(last_obs_D_bef_switch_t_XX)
+gegen last_obs_D_bef_switch_XX = max(last_obs_D_bef_switch_t_XX) ///
+        , by(group_XX)
 
 *For groups that do not experience a treatment change, we just have FD_g<=LD_g, and we will deal with missing treatments depending on when they occur with respect to those two dates.
 
@@ -1003,7 +1016,8 @@ replace F_g_XX=T_max_XX+1 if F_g_XX<T_max_XX+1&last_obs_D_bef_switch_XX<F_g_XX-1
 *For groups that experience a treatment change, if D_gt missing at F_g<t, we replace their missing treatment by D(g,F_g). This is again a liberal convention, but it is innocuous for the reduced-form parameters DID_l, so we do not give the user the option to overrule it (Note that overruling it could make the same_switchers option fail)
 
 gen d_F_g_temp_XX = treatment_XX if time_XX==F_g_XX
-bys group_XX: gegen d_F_g_XX = mean(d_F_g_temp_XX)
+gegen d_F_g_XX = mean(d_F_g_temp_XX) ///
+        , by(group_XX)
 replace treatment_XX=d_F_g_XX if F_g_XX<T_max_XX+1&treatment_XX==.&time_XX>F_g_XX&last_obs_D_bef_switch_XX==F_g_XX-1
 
 *For groups that do not experience a treatment change, if D_gt missing at FD_g<t<LD_g, we replace their missing treatment by D_g1. This is again a liberal convention, so we give the user the option to not use those observations, with drop_if_d_miss_before_first_switch option.
@@ -1052,17 +1066,20 @@ if "`trends_lin'"!=""{
 cap rename _merge _merge_og
 fillin group_XX time_XX
 capture drop d_sq_XX_new
-bys group_XX: gegen d_sq_XX_new=mean(d_sq_XX)
+gegen d_sq_XX_new = mean(d_sq_XX) ///
+        , by(group_XX)
 drop d_sq_XX
 rename d_sq_XX_new d_sq_XX
 
 ///// CHANGE BELOW - tks
 
-bys group_XX: gegen d_sq_int_XX_new = mean(d_sq_int_XX)
+gegen d_sq_int_XX_new = mean(d_sq_int_XX) ///
+        , by(group_XX)
 drop d_sq_int_XX
 rename d_sq_int_XX_new d_sq_int_XX
 
-bys group_XX: gegen F_g_XX_new = mean(F_g_XX)
+gegen F_g_XX_new = mean(F_g_XX) ///
+        , by(group_XX)
 drop F_g_XX
 rename F_g_XX_new F_g_XX
 
@@ -1082,7 +1099,8 @@ replace N_gt_XX=0 if outcome_XX==.|treatment_XX==.
 capture drop F_g_trunc_XX
 gen F_g_trunc_XX=F_g_XX
 replace F_g_trunc_XX=min(F_g_XX,trunc_control_XX) if trunc_control_XX!=.
-bys d_sq_XX `trends_nonparam': gegen T_g_XX = max(F_g_trunc_XX) 
+gegen T_g_XX = max(F_g_trunc_XX) ///
+        , by(d_sq_XX `trends_nonparam')
 replace T_g_XX = T_g_XX-1
 
 ///// Defining S_g: 
@@ -1092,11 +1110,15 @@ replace T_g_XX = T_g_XX-1
 ///// For never-switchers, S_g is undefined.
 ///// Definition of S_g matches that in paper, unless dont_drop_larger_lower specified.
 
-bys group_XX : gegen avg_post_switch_treat_XX_temp = total(treatment_XX) if time_XX>=F_g_XX&time_XX<=T_g_XX
+gegen avg_post_switch_treat_XX_temp = total(treatment_XX) if time_XX >= ///
+        F_g_XX & time_XX <= T_g_XX ///
+        , by(group_XX)
 gen count_time_post_switch_XX_temp=(treatment_XX!=.) if time_XX>=F_g_XX&time_XX<=T_g_XX
-bysort group_XX : gegen count_time_post_switch_XX=total(count_time_post_switch_XX_temp)
+gegen count_time_post_switch_XX = total(count_time_post_switch_XX_temp) ///
+        , by(group_XX)
 replace avg_post_switch_treat_XX_temp =avg_post_switch_treat_XX_temp/count_time_post_switch_XX
-bys group_XX: gegen avg_post_switch_treat_XX=mean(avg_post_switch_treat_XX_temp)
+gegen avg_post_switch_treat_XX = mean(avg_post_switch_treat_XX_temp) ///
+        , by(group_XX)
 drop avg_post_switch_treat_XX_temp
 
 // When a group is a switching group, but its average post-treatment treatment 
@@ -1162,7 +1184,8 @@ if `continuous'>0{
 
 ///// Creating treatment at F_g: D_{g,F_g}
 gen d_fg_XX_temp=treatment_XX if time_XX==F_g_XX
-bys group_XX: gegen d_fg_XX=mean(d_fg_XX_temp)
+gegen d_fg_XX = mean(d_fg_XX_temp) ///
+        , by(group_XX)
 replace d_fg_XX=d_sq_XX if d_fg_XX==. & F_g_XX==T_max_XX+1
 drop d_fg_XX_temp 
 
@@ -1186,7 +1209,8 @@ if "`cluster'"!=""{
 		
 	// FELIX 06-03-25 -> I guess this is how Tom solved it 
 	cap drop cluster_group_XX
-	bysort group_XX: gegen cluster_group_XX=min(`cluster') 
+        gegen cluster_group_XX = min(`cluster') ///
+                , by(group_XX)
 	bysort group_XX: replace `cluster'=cluster_group_XX if `cluster'==.
 	// Can do this because clusters have to be coarser than groups
 	
@@ -1195,7 +1219,8 @@ if "`cluster'"!=""{
 	bysort `cluster' (group_XX time_XX) : gen first_obs_by_clust_XX = (_n==1) if `cluster'!=. // FELIX 05_03_25 -> This is then not needed anymore
 	
 	//Error message for clustering: non-nested case
-	bysort group_XX: gegen cluster_var_g_XX = sd(`cluster')
+        gegen cluster_var_g_XX = sd(`cluster') ///
+                , by(group_XX)
 	sum cluster_var_g_XX
 	scalar max_cluster_var_XX = `r(max)'
 	if (scalar(max_cluster_var_XX) >0){
@@ -1253,8 +1278,13 @@ capture drop sum_weights_control_XX //So as to consider the weighted regressions
 // Computing  \Delta X_{.,t}: average of controls' first difference at time t, 
 // among groups whose treatment has not changed yet.
 
-bys time_XX d_sq_XX `trends_nonparam' : gegen sum_weights_control_XX = total(N_gt_XX) if ever_change_d_XX==0&diff_y_XX!=.&fd_X_all_non_missing_XX==1
-bys time_XX d_sq_XX `trends_nonparam' : gegen avg_diff_X`count_controls'_XX = total(N_gt_XX*diff_X`count_controls'_XX) if ever_change_d_XX==0&diff_y_XX!=.&fd_X_all_non_missing_XX==1
+gegen sum_weights_control_XX = total(N_gt_XX) if ever_change_d_XX == 0 & ///
+        diff_y_XX != . & fd_X_all_non_missing_XX == 1 ///
+        , by(time_XX d_sq_XX `trends_nonparam')
+gegen avg_diff_X`count_controls'_XX = ///
+        total(N_gt_XX*diff_X`count_controls'_XX) if ever_change_d_XX == 0 & ///
+        diff_y_XX != . & fd_X_all_non_missing_XX == 1 ///
+        , by(time_XX d_sq_XX `trends_nonparam')
 
 bys time_XX d_sq_XX `trends_nonparam' : replace avg_diff_X`count_controls'_XX = avg_diff_X`count_controls'_XX/sum_weights_control_XX
 
@@ -2446,7 +2476,8 @@ if "`cluster'"!=""{
 	replace U_Gg_var_glob_`i'_XX = U_Gg_var_glob_`i'_XX*first_obs_by_gp_XX
 	
 	* Sum within cluster
-	bys `cluster' : gegen clust_U_Gg_var_glob_`i'_XX = total(U_Gg_var_glob_`i'_XX)
+        gegen clust_U_Gg_var_glob_`i'_XX = total(U_Gg_var_glob_`i'_XX) ///
+                , by(`cluster')
 	
 	* Compute average of square
 	gen clust_U_Gg_var_glob_`i'_2_XX=clust_U_Gg_var_glob_`i'_XX^2*first_obs_by_clust_XX
@@ -2516,7 +2547,8 @@ if "`cluster'"!=""{
 	
 	replace U_Gg_var_glob_pl_`i'_XX = U_Gg_var_glob_pl_`i'_XX*first_obs_by_gp_XX
 
-	bys `cluster' : gegen clust_U_Gg_var_glob_pl_`i'_XX= total(U_Gg_var_glob_pl_`i'_XX)
+        gegen clust_U_Gg_var_glob_pl_`i'_XX= total(U_Gg_var_glob_pl_`i'_XX) ///
+                , by(`cluster')
 
 	gen clust_U_Gg_var_glob_pl_`i'_2_XX=clust_U_Gg_var_glob_pl_`i'_XX^2*first_obs_by_clust_XX
 	
@@ -2571,7 +2603,8 @@ if "`cluster'"!=""{
 	
 	replace U_Gg_var_global_XX=U_Gg_var_global_XX*first_obs_by_gp_XX
 	
-	bys `cluster' : gegen clust_U_Gg_var_global_XX= total(U_Gg_var_global_XX)
+        gegen clust_U_Gg_var_global_XX= total(U_Gg_var_global_XX) ///
+                , by(`cluster')
 	
 	replace clust_U_Gg_var_global_XX=clust_U_Gg_var_global_XX^2*first_obs_by_clust_XX
 	
@@ -3425,19 +3458,22 @@ capture drop d_sq_group_XX
 // Defining the parts needed for the long difference 
 * Yg,Fg−1
 gen Yg_Fg_min1_XX_temp=outcome_non_diff_XX if time_XX==F_g_XX-1
-bys group_XX: gegen Yg_Fg_min_1_XX=mean(Yg_Fg_min1_XX_temp)
+gegen Yg_Fg_min_1_XX = mean(Yg_Fg_min1_XX_temp) ///
+        , by(group_XX)
 capture drop Yg_Fg_min1_XX_temp
 
 * Yg,Fg−2 
 if "`trends_lin'" != ""{
 gen Yg_Fg_min2_XX_temp=outcome_non_diff_XX if time_XX==F_g_XX-2
-bys group_XX: gegen Yg_Fg_min_2_XX=mean(Yg_Fg_min2_XX_temp)
+gegen Yg_Fg_min_2_XX = mean(Yg_Fg_min2_XX_temp) ///
+        , by(group_XX)
 capture drop Yg_Fg_min2_XX_temp
 }
 
 * Yg,Fg−1+ℓ
 gen Yg_Fg_`i'_XX_temp=outcome_non_diff_XX if time_XX==F_g_XX-1+`i'
-bys group_XX: gegen Yg_Fg_`i'_XX=mean(Yg_Fg_`i'_XX_temp)
+gegen Yg_Fg_`i'_XX = mean(Yg_Fg_`i'_XX_temp) ///
+        , by(group_XX)
 capture drop Yg_Fg_`i'_XX_temp
 
 // Now generate Sg*(Yg,Fg−1+ℓ − Yg,Fg−1) 
@@ -3590,7 +3626,8 @@ foreach i in `all_effects_XX'{
 
 // Modif Felix: Yg,Fg−1-ℓ
 gen Yg_Fg_pl_`i'_XX_temp=outcome_non_diff_XX if time_XX==F_g_XX-1-`i'
-bys group_XX: gegen Yg_Fg_pl_`i'_XX=mean(Yg_Fg_pl_`i'_XX_temp)
+gegen Yg_Fg_pl_`i'_XX = mean(Yg_Fg_pl_`i'_XX_temp) ///
+        , by(group_XX)
 capture drop Yg_Fg_pl_`i'_XX_temp
 
 // Modif Felix: Now generate Sg*(Yg,Fg−1-ℓ − Yg,Fg−1) 
@@ -4703,7 +4740,8 @@ if "`less_conservative_se'" != ""{
 
 // Creating a time-invariant, group-level variable, containing g's treatment at F_g-1+\ell
 gen d_fg_XX_temp=treatment_XX if time_XX==F_g_XX + `=-1+`i''
-bys group_XX: gegen d_fg`i'_XX=mean(d_fg_XX_temp)
+gegen d_fg`i'_XX = mean(d_fg_XX_temp) ///
+        , by(group_XX)
 
 // This variable might be missing, for groups whose treatment never changes, and
 // for groups not observed \ell periods after treatment change. Then, we impute
@@ -4720,9 +4758,11 @@ drop d_fg_XX_temp
 // For each group, define a variable counting how many groups belong to the same cohort,
 // with cohorts defined as d_fg0_XX F_g_XX, as well as the full path.
 if `i'==1{
-	bysort path_0_XX: gegen num_g_paths_0_XX=nunique(group_XX)
+        gegen num_g_paths_0_XX = nunique(group_XX) ///
+                , by(path_0_XX)
 }
-bysort path_`i'_XX: gegen num_g_paths_`i'_XX=nunique(group_XX)
+gegen num_g_paths_`i'_XX = nunique(group_XX) ///
+        , by(path_`i'_XX)
 
 // For each group, generate a dummy for whether at least two groups in their cohort.
 gen cohort_fullpath_`i'_XX=(num_g_paths_`i'_XX>1)
@@ -4741,7 +4781,8 @@ if "`only_never_switchers'" != "" {
 ///// Creating N^g_t:
 ///// number of control groups for g at t
 gen never_change_d_`i'_wXX = never_change_d_`i'_XX*N_gt_XX
-bys time_XX d_sq_XX `trends_nonparam': gegen N_gt_control_`i'_XX=total(never_change_d_`i'_wXX)
+gegen N_gt_control_`i'_XX = total(never_change_d_`i'_wXX) ///
+        , by(time_XX d_sq_XX `trends_nonparam')
 
 ///// Creating binary variable indicating whether g is \ell periods away from switch
 
@@ -4779,7 +4820,8 @@ forv j = 1/`=`effects'' {
 		replace never_change_d_last_XX = 0 if F_g_XX > time_XX & F_g_XX < T_max_XX + 1 & diff_y_last_XX != .
 	}
 	gen never_change_d_last_wXX = never_change_d_last_XX*N_gt_XX
-	bys time_XX d_sq_XX `trends_nonparam': gegen N_gt_control_last_XX=total(never_change_d_last_wXX)
+        gegen N_gt_control_last_XX = total(never_change_d_last_wXX) ///
+                , by(time_XX d_sq_XX `trends_nonparam')
 
 	gen N_g_control_last_temp_XX = N_gt_control_last_XX if time_XX == F_g_XX - 1 + `j'
 	bys group_XX: egen N_g_control_last_m_XX = mean(N_g_control_last_temp_XX)
@@ -4812,7 +4854,8 @@ forv j = 1/`=`placebo'' {
 		replace never_change_d_last_XX = 0 if F_g_XX > time_XX & F_g_XX < T_max_XX + 1 & diff_y_last_XX != .
 	}
 	gen never_change_d_last_wXX = never_change_d_last_XX*N_gt_XX
-	bys time_XX d_sq_XX `trends_nonparam': gegen N_gt_control_last_XX=total(never_change_d_last_wXX)
+        gegen N_gt_control_last_XX = total(never_change_d_last_wXX) ///
+                , by(time_XX d_sq_XX `trends_nonparam')
 
 	gen N_g_control_last_temp_XX = N_gt_control_last_XX if time_XX == F_g_XX - 1 - `j'
 	bys group_XX: egen N_g_control_last_m_XX = mean(N_g_control_last_temp_XX)
@@ -4882,7 +4925,8 @@ gen distance_to_switch_`i'_XX=(time_XX==F_g_XX-1+`i'&`i'<=L_g_XX&S_g_XX==increas
 ///// Creating a variable counting the number of groups \ell periods away from switch at t
 
 gen distance_to_switch_`i'_wXX = distance_to_switch_`i'_XX*N_gt_XX
-bys time_XX: gegen N`=increase_XX'_t_`i'_XX=total(distance_to_switch_`i'_wXX)
+gegen N`=increase_XX'_t_`i'_XX = total(distance_to_switch_`i'_wXX) ///
+        , by(time_XX)
 
 ///// Computing N1_l,N0_l.
 
@@ -4898,7 +4942,8 @@ forvalue t=`=t_min_XX'/`=T_max_XX'{
 // Modif Felix weight
 if "`weight'"!=""{
 
-	bys time_XX: gegen N`=increase_XX'_t_`i'_XX_w=total(distance_to_switch_`i'_XX)
+        gegen N`=increase_XX'_t_`i'_XX_w = total(distance_to_switch_`i'_XX) ///
+                , by(time_XX)
 	
 	scalar N`=increase_XX'_`i'_XX_weight =0
 
@@ -4913,7 +4958,8 @@ forvalue t=`=t_min_XX'/`=T_max_XX'{
 ///// Variable counting number of groups \ell periods away from switch at t, 
 ///// and with same D_{g,1} and trends_nonparam.
 
-bys time_XX d_sq_XX `trends_nonparam': gegen N`=increase_XX'_t_`i'_g_XX=total(distance_to_switch_`i'_wXX)
+gegen N`=increase_XX'_t_`i'_g_XX = total(distance_to_switch_`i'_wXX) ///
+        , by(time_XX d_sq_XX `trends_nonparam')
 
 ///// Creating all the adjustment terms to compute estimators with controls, and their variances
  
@@ -4963,7 +5009,9 @@ capture drop m`=increase_XX'_g_`count_controls'_`l'_`i'_XX
 gen m`=increase_XX'_g_`count_controls'_`l'_`i'_XX = (`i' <= T_g_XX-2 & d_sq_int_XX == `l')* (G_XX / N`=increase_XX'_`i'_XX) * ([distance_to_switch_`i'_XX - (N`=increase_XX'_t_`i'_g_XX/N_gt_control_`i'_XX) * never_change_d_`i'_XX] * (time_XX>=`=`i'+1'&time_XX<=T_g_XX) * diff_X`count_controls'_`i'_N_XX)
 *Summing that variable across t, and leaving one non missing observation per g	
 capture drop m`=increase_XX'_`l'_`count_controls'_`i'_XX
-bys group_XX: gegen m`=increase_XX'_`l'_`count_controls'_`i'_XX=total(m`=increase_XX'_g_`count_controls'_`l'_`i'_XX)
+gegen m`=increase_XX'_`l'_`count_controls'_`i'_XX = ///
+        total(m`=increase_XX'_g_`count_controls'_`l'_`i'_XX) ///
+        , by(group_XX)
 bys group_XX: replace m`=increase_XX'_`l'_`count_controls'_`i'_XX = . if _n != 1
 
 // Computing coordinates of vectors M^+_{d,\ell} and M^-_{d,\ell}
@@ -4988,7 +5036,10 @@ replace dummy_XX = (F_g_XX>time_XX & d_sq_int_XX == `l') if diff_y_XX < .
 	else {
 		cap drop cluster_temp_XX
 		gen cluster_temp_XX= `cluster' if dummy_XX == 1
-		bys time_XX : gegen E_hat_denom_`count_controls'_`l'_XX = nunique(cluster_temp_XX) if !missing(cluster_temp_XX)
+                gegen E_hat_denom_`count_controls'_`l'_XX = ///
+                        nunique(cluster_temp_XX) if ///
+                        !missing(cluster_temp_XX) ///
+                        , by(time_XX)
 	}
 }
 // End Modif Clément 20/6/2025
@@ -5017,7 +5068,9 @@ gen in_sum_temp_`count_controls'_`l'_XX = (prod_X`count_controls'_Ngt_XX*(1+(E_h
 
 capture drop in_sum_`count_controls'_`l'_XX
 capture drop in_sum_temp_adj_`count_controls'_`l'_XX
-bys group_XX: gegen in_sum_`count_controls'_`l'_XX = total(in_sum_temp_`count_controls'_`l'_XX) 
+gegen in_sum_`count_controls'_`l'_XX = ///
+        total(in_sum_temp_`count_controls'_`l'_XX) ///
+        , by(group_XX)
 
 }
 
@@ -5059,10 +5112,13 @@ gen dof_s_`i'_XX = (N_gt_XX != 0&distance_to_switch_`i'_XX==1)
 
 // Modif Clément: we need to add by time
 * Mean's denominator
-bys d_sq_XX `trends_nonparam' time_XX : gegen count_cohort_`i'_ns_t_XX=total(N_gt_XX) if dof_ns_`i'_XX == 1
+gegen count_cohort_`i'_ns_t_XX = total(N_gt_XX) if dof_ns_`i'_XX == 1 ///
+        , by(d_sq_XX `trends_nonparam' time_XX)
 
 * Mean's numerator
-bys d_sq_XX `trends_nonparam' time_XX: gegen total_cohort_`i'_ns_t_XX=total(diff_y_`i'_N_gt_XX) if dof_ns_`i'_XX == 1
+gegen total_cohort_`i'_ns_t_XX = total(diff_y_`i'_N_gt_XX) if dof_ns_`i'_XX ///
+        == 1 ///
+        , by(d_sq_XX `trends_nonparam' time_XX)
 
 * Mean 
 gen mean_cohort_`i'_ns_t_XX=total_cohort_`i'_ns_t_XX/count_cohort_`i'_ns_t_XX
@@ -5070,12 +5126,17 @@ gen mean_cohort_`i'_ns_t_XX=total_cohort_`i'_ns_t_XX/count_cohort_`i'_ns_t_XX
 * Counting number of groups for DOF adjustment
 {
 	if "`cluster'" == "" {
-		bys d_sq_XX `trends_nonparam' time_XX: gegen dof_cohort_`i'_ns_t_XX=total(dof_ns_`i'_XX) if dof_ns_`i'_XX == 1
+                gegen dof_cohort_`i'_ns_t_XX = total(dof_ns_`i'_XX) if ///
+                        dof_ns_`i'_XX == 1 ///
+                        , by(d_sq_XX `trends_nonparam' time_XX)
 	}
 	else {
 		cap drop cluster_dof_`i'_ns_XX
 		gen cluster_dof_`i'_ns_XX = `cluster' if dof_ns_`i'_XX == 1
-		bys d_sq_XX `trends_nonparam' time_XX: gegen dof_cohort_`i'_ns_t_XX = nunique(cluster_dof_`i'_ns_XX) if !missing(cluster_dof_`i'_ns_XX)
+                gegen dof_cohort_`i'_ns_t_XX = ///
+                        nunique(cluster_dof_`i'_ns_XX) if ///
+                        !missing(cluster_dof_`i'_ns_XX) ///
+                        , by(d_sq_XX `trends_nonparam' time_XX)
 	}
 }
 // End modif Clément
@@ -5086,10 +5147,13 @@ gen mean_cohort_`i'_ns_t_XX=total_cohort_`i'_ns_t_XX/count_cohort_`i'_ns_t_XX
 if "`less_conservative_se'" == ""{
 	
 * Mean's denominator
-bys d_sq_XX F_g_XX d_fg_XX `trends_nonparam' : gegen count_cohort_`i'_s_t_XX=total(N_gt_XX) if dof_s_`i'_XX==1
+gegen count_cohort_`i'_s_t_XX = total(N_gt_XX) if dof_s_`i'_XX == 1 ///
+        , by(d_sq_XX F_g_XX d_fg_XX `trends_nonparam')
 
 * Mean's numerator
-bys d_sq_XX F_g_XX d_fg_XX `trends_nonparam' : gegen total_cohort_`i'_s_t_XX=total(diff_y_`i'_N_gt_XX) if dof_s_`i'_XX==1 
+gegen total_cohort_`i'_s_t_XX = total(diff_y_`i'_N_gt_XX) if dof_s_`i'_XX == ///
+        1 ///
+        , by(d_sq_XX F_g_XX d_fg_XX `trends_nonparam')
 
 * Mean 
 gen mean_cohort_`i'_s_t_XX=total_cohort_`i'_s_t_XX/count_cohort_`i'_s_t_XX	
@@ -5098,12 +5162,16 @@ gen mean_cohort_`i'_s_t_XX=total_cohort_`i'_s_t_XX/count_cohort_`i'_s_t_XX
 // Changes Diego 16-06-25: adjust DoF with clusters
 {
 	if "`cluster'" == "" {
-		bys d_sq_XX F_g_XX d_fg_XX `trends_nonparam' : gegen dof_cohort_`i'_s_t_XX=total(dof_s_`i'_XX) if dof_s_`i'_XX==1
+                gegen dof_cohort_`i'_s_t_XX = total(dof_s_`i'_XX) if ///
+                        dof_s_`i'_XX == 1 ///
+                        , by(d_sq_XX F_g_XX d_fg_XX `trends_nonparam')
 	}
 	else {
 		cap drop cluster_dof_`i'_s_XX
 		gen cluster_dof_`i'_s_XX = `cluster' if dof_s_`i'_XX == 1
-		bys d_sq_XX F_g_XX d_fg_XX `trends_nonparam': gegen dof_cohort_`i'_s_t_XX = nunique(cluster_dof_`i'_s_XX) if !missing(cluster_dof_`i'_s_XX)
+                gegen dof_cohort_`i'_s_t_XX = nunique(cluster_dof_`i'_s_XX) ///
+                        if !missing(cluster_dof_`i'_s_XX) ///
+                        , by(d_sq_XX F_g_XX d_fg_XX `trends_nonparam')
 	}
 }
 }
@@ -5120,40 +5188,61 @@ if "`less_conservative_se'" != ""{
 		
 * Mean's denominator	
 * by D_{g,1}, F_g, `trends_nonparam':
-bys path_0_XX `trends_nonparam' : gegen count_cohort_`i'_s0_t_XX=total(N_gt_XX) if dof_s_`i'_XX==1
+gegen count_cohort_`i'_s0_t_XX = total(N_gt_XX) if dof_s_`i'_XX == 1 ///
+        , by(path_0_XX `trends_nonparam')
 * by D_{g,1}, F_g, D_{g,F_g}, `trends_nonparam':
-bys path_1_XX `trends_nonparam' : gegen count_cohort_`i'_s1_t_XX=total(N_gt_XX) if dof_s_`i'_XX==1
+gegen count_cohort_`i'_s1_t_XX = total(N_gt_XX) if dof_s_`i'_XX == 1 ///
+        , by(path_1_XX `trends_nonparam')
 * by D_{g,1}, F_g, D_{g,F_g},..., D_{g,F_g+\ell}, `trends_nonparam':
-bys path_`i'_XX `trends_nonparam' : gegen count_cohort_`i'_s2_t_XX=total(N_gt_XX) if dof_s_`i'_XX==1
+gegen count_cohort_`i'_s2_t_XX = total(N_gt_XX) if dof_s_`i'_XX == 1 ///
+        , by(path_`i'_XX `trends_nonparam')
 	
 * Mean's numerator
 * by D_{g,1}, F_g, `trends_nonparam':
-bys path_0_XX `trends_nonparam' : gegen total_cohort_`i'_s0_t_XX=total(diff_y_`i'_N_gt_XX) if dof_s_`i'_XX==1
+gegen total_cohort_`i'_s0_t_XX = total(diff_y_`i'_N_gt_XX) if dof_s_`i'_XX ///
+        == 1 ///
+        , by(path_0_XX `trends_nonparam')
 * by D_{g,1}, F_g, D_{g,F_g}, `trends_nonparam':
-bys path_1_XX `trends_nonparam' : gegen total_cohort_`i'_s1_t_XX=total(diff_y_`i'_N_gt_XX) if dof_s_`i'_XX==1	
+gegen total_cohort_`i'_s1_t_XX = total(diff_y_`i'_N_gt_XX) if dof_s_`i'_XX ///
+        == 1 ///
+        , by(path_1_XX `trends_nonparam')
 * by D_{g,1}, F_g, D_{g,F_g},..., D_{g,F_g+\ell}, `trends_nonparam':
-bys path_`i'_XX `trends_nonparam' : gegen total_cohort_`i'_s2_t_XX=total(diff_y_`i'_N_gt_XX) if dof_s_`i'_XX==1
+gegen total_cohort_`i'_s2_t_XX = total(diff_y_`i'_N_gt_XX) if dof_s_`i'_XX ///
+        == 1 ///
+        , by(path_`i'_XX `trends_nonparam')
 
 * Counting number of groups for DOF adjustment
 // Changes Diego 16-06-25: adjust DoF with clusters
 {
 	if "`cluster'" == "" {
 		* by D_{g,1}, F_g, `trends_nonparam':
-		bys path_0_XX `trends_nonparam' : gegen dof_cohort_`i'_s0_t_XX=total(dof_s_`i'_XX) if dof_s_`i'_XX==1
+                gegen dof_cohort_`i'_s0_t_XX = total(dof_s_`i'_XX) if ///
+                        dof_s_`i'_XX == 1 ///
+                        , by(path_0_XX `trends_nonparam')
 		* by D_{g,1}, F_g, D_{g,F_g}, `trends_nonparam':
-		bys path_1_XX `trends_nonparam' : gegen dof_cohort_`i'_s1_t_XX=total(dof_s_`i'_XX) if dof_s_`i'_XX==1
+                gegen dof_cohort_`i'_s1_t_XX = total(dof_s_`i'_XX) if ///
+                        dof_s_`i'_XX == 1 ///
+                        , by(path_1_XX `trends_nonparam')
 		* by D_{g,1}, F_g, D_{g,F_g},..., D_{g,F_g+\ell}, `trends_nonparam':
-		bys path_`i'_XX `trends_nonparam' : gegen dof_cohort_`i'_s2_t_XX=total(dof_s_`i'_XX) if dof_s_`i'_XX==1
+                gegen dof_cohort_`i'_s2_t_XX = total(dof_s_`i'_XX) if ///
+                        dof_s_`i'_XX == 1 ///
+                        , by(path_`i'_XX `trends_nonparam')
 	}
 	else {
 		cap drop cluster_dof_`i'_s_XX
 		gen cluster_dof_`i'_s_XX = `cluster' if dof_s_`i'_XX == 1
 		* by D_{g,1}, F_g, `trends_nonparam':
-		bys path_0_XX `trends_nonparam' : gegen dof_cohort_`i'_s0_t_XX = nunique(cluster_dof_`i'_s_XX) if !missing(cluster_dof_`i'_s_XX)
+                gegen dof_cohort_`i'_s0_t_XX = nunique(cluster_dof_`i'_s_XX) ///
+                        if !missing(cluster_dof_`i'_s_XX) ///
+                        , by(path_0_XX `trends_nonparam')
 		* by D_{g,1}, F_g, D_{g,F_g}, `trends_nonparam':
-		bys path_1_XX `trends_nonparam' : gegen dof_cohort_`i'_s1_t_XX = nunique(cluster_dof_`i'_s_XX) if !missing(cluster_dof_`i'_s_XX)
+                gegen dof_cohort_`i'_s1_t_XX = nunique(cluster_dof_`i'_s_XX) ///
+                        if !missing(cluster_dof_`i'_s_XX) ///
+                        , by(path_1_XX `trends_nonparam')
 		* by D_{g,1}, F_g, D_{g,F_g},..., D_{g,F_g+\ell}, `trends_nonparam':
-		bys path_`i'_XX `trends_nonparam' : gegen dof_cohort_`i'_s2_t_XX = nunique(cluster_dof_`i'_s_XX) if !missing(cluster_dof_`i'_s_XX)
+                gegen dof_cohort_`i'_s2_t_XX = nunique(cluster_dof_`i'_s_XX) ///
+                        if !missing(cluster_dof_`i'_s_XX) ///
+                        , by(path_`i'_XX `trends_nonparam')
 
 	}
 }
@@ -5182,10 +5271,13 @@ cap drop dof_cohort_`i'_ns_s_t_XX
 gen dof_ns_s_`i'_XX=(dof_s_`i'_XX==1|dof_ns_`i'_XX ==1)
 
 * Mean's denominator
-bys d_sq_XX `trends_nonparam' time_XX : gegen count_cohort_`i'_ns_s_t_XX=total(N_gt_XX) if dof_ns_s_`i'_XX==1
+gegen count_cohort_`i'_ns_s_t_XX = total(N_gt_XX) if dof_ns_s_`i'_XX == 1 ///
+        , by(d_sq_XX `trends_nonparam' time_XX)
 
 * Mean's numerator
-bys d_sq_XX `trends_nonparam' time_XX: gegen total_cohort_`i'_ns_s_t_XX=total(diff_y_`i'_N_gt_XX) if dof_ns_s_`i'_XX==1
+gegen total_cohort_`i'_ns_s_t_XX = total(diff_y_`i'_N_gt_XX) if ///
+        dof_ns_s_`i'_XX == 1 ///
+        , by(d_sq_XX `trends_nonparam' time_XX)
 
 * Mean 
 gen mean_cohort_`i'_ns_s_t_XX=total_cohort_`i'_ns_s_t_XX/count_cohort_`i'_ns_s_t_XX
@@ -5193,12 +5285,17 @@ gen mean_cohort_`i'_ns_s_t_XX=total_cohort_`i'_ns_s_t_XX/count_cohort_`i'_ns_s_t
 * Counting number of groups for DOF adjustment
 {
 	if "`cluster'" == "" {
-		bys d_sq_XX `trends_nonparam' time_XX: gegen dof_cohort_`i'_ns_s_t_XX=total(dof_ns_s_`i'_XX) if dof_ns_s_`i'_XX==1
+                gegen dof_cohort_`i'_ns_s_t_XX = total(dof_ns_s_`i'_XX) if ///
+                        dof_ns_s_`i'_XX == 1 ///
+                        , by(d_sq_XX `trends_nonparam' time_XX)
 	}
 	else {
 		cap drop cluster_dof_`i'_ns_s_XX
 		gen cluster_dof_`i'_ns_s_XX = `cluster' if dof_ns_s_`i'_XX==1
-		bys d_sq_XX `trends_nonparam' time_XX: gegen dof_cohort_`i'_ns_s_t_XX = nunique(cluster_dof_`i'_ns_s_XX) if !missing(cluster_dof_`i'_ns_s_XX)
+                gegen dof_cohort_`i'_ns_s_t_XX = ///
+                        nunique(cluster_dof_`i'_ns_s_XX) if ///
+                        !missing(cluster_dof_`i'_ns_s_XX) ///
+                        , by(d_sq_XX `trends_nonparam' time_XX)
 	}
 }	
 
@@ -5235,7 +5332,8 @@ gen U_Gg`i'_temp_XX = dummy_U_Gg`i'_XX*(G_XX / N`=increase_XX'_`i'_XX) * (time_X
 
 replace U_Gg`i'_temp_XX = U_Gg`i'_temp_XX* diff_y_`i'_XX 
 
-bysort group_XX : gegen U_Gg`i'_XX=total(U_Gg`i'_temp_XX)
+gegen U_Gg`i'_XX = total(U_Gg`i'_temp_XX) ///
+        , by(group_XX)
 
 replace U_Gg`i'_XX = U_Gg`i'_XX*first_obs_by_gp_XX
 
@@ -5305,7 +5403,8 @@ replace part2_switch`=increase_XX'_`i'_XX=part2_switch`=increase_XX'_`i'_XX+comb
 }	
 
 // Summing the U^(var)_{G,g,l}s over time periods for each group
-bys group_XX: gegen U_Gg`i'_var_XX=total(U_Gg`i'_temp_var_XX)
+gegen U_Gg`i'_var_XX = total(U_Gg`i'_temp_var_XX) ///
+        , by(group_XX)
 
 // Modeif Felix 21.03.2025 (adjust order of adding additional term and summing across t)
 if "`controls'" != "" {
@@ -5332,11 +5431,17 @@ if "`normalized'"!=""{
 	capture drop delta_D_`i'_cum_temp_XX
 	
 	if `continuous'==0{
-		bys group_XX : gegen sum_treat_until_`i'_XX = total(treatment_XX - d_sq_XX) if time_XX>=F_g_XX&time_XX<=F_g_XX-1+`i'&S_g_XX==increase_XX
+                gegen sum_treat_until_`i'_XX = total(treatment_XX - d_sq_XX) ///
+                        if time_XX >= F_g_XX & time_XX <= F_g_XX - 1 + `i' & ///
+                        S_g_XX == increase_XX ///
+                        , by(group_XX)
 	}
 	// Redefine this with original treatment if continuous is defined (treatment was binarized and staggerized)
 	else if `continuous'>0{
-		bys group_XX : gegen sum_treat_until_`i'_XX = total(treatment_XX_orig - d_sq_XX_orig) if time_XX>=F_g_XX&time_XX<=F_g_XX-1+`i'&S_g_XX==increase_XX
+                gegen sum_treat_until_`i'_XX = total(treatment_XX_orig - ///
+                        d_sq_XX_orig) if time_XX >= F_g_XX & time_XX <= ///
+                        F_g_XX - 1 + `i' & S_g_XX == increase_XX ///
+                        , by(group_XX)
 	}
 gen delta_D_`i'_cum_temp_XX = N_gt_XX/N`=increase_XX'_`i'_XX*[sum_treat_until_`i'_XX* S_g_XX + (1-S_g_XX)*(-sum_treat_until_`i'_XX)] if distance_to_switch_`i'_XX==1 
 
@@ -5440,7 +5545,8 @@ bys group_XX: gen never_change_d_pl_`i'_XX=never_change_d_`i'_XX*(diff_y_pl_`i'_
 gen never_change_d_pl_`i'_wXX=never_change_d_pl_`i'_XX*N_gt_XX
 
 ///// number of control groups for g at t
-bys time_XX d_sq_XX `trends_nonparam': gegen N_gt_control_placebo_`i'_XX=total(never_change_d_pl_`i'_wXX) 
+gegen N_gt_control_placebo_`i'_XX = total(never_change_d_pl_`i'_wXX) ///
+        , by(time_XX d_sq_XX `trends_nonparam')
 
 ///// Creating binary variable indicating whether g is \ell periods away from switch & (diff_y_pl_`i'_XX!=.) is well defined -> based on the already defined distance_to_switch_`i'_XX variable 
 *Modif Clément 26/09/2025:
@@ -5453,7 +5559,8 @@ if "`same_switchers_pl'"!=""{
 
 ///// Creating a variable counting the number of groups \ell periods away from switch at t
 gen dist_to_switch_pl_`i'_wXX= dist_to_switch_pl_`i'_XX*N_gt_XX
-bys time_XX: gegen N`=increase_XX'_t_placebo_`i'_XX=total(dist_to_switch_pl_`i'_wXX)
+gegen N`=increase_XX'_t_placebo_`i'_XX = total(dist_to_switch_pl_`i'_wXX) ///
+        , by(time_XX)
 
 ///// Computing N^1_\ell/N^0_\ell. for the placebos
 
@@ -5469,7 +5576,9 @@ forvalue t=`=t_min_XX'/`=T_max_XX'{
 // Modif Felix weight
 if "`weight'"!=""{
 
-	bys time_XX: gegen N`=increase_XX'_t_pl_`i'_XX_w=total(dist_to_switch_pl_`i'_XX)
+        gegen N`=increase_XX'_t_pl_`i'_XX_w = ///
+                total(dist_to_switch_pl_`i'_XX) ///
+                , by(time_XX)
 	
 	scalar N`=increase_XX'_`i'_pl_XX_weight=0
 
@@ -5484,7 +5593,8 @@ forvalue t=`=t_min_XX'/`=T_max_XX'{
 ///// Variable counting number of groups \ell periods away from switch at t, 
 ///// and with same D_{g,1} and trends_nonparam.
 
-bys time_XX d_sq_XX `trends_nonparam': gegen N`=increase_XX'_t_placebo_`i'_g_XX=total(dist_to_switch_pl_`i'_wXX)
+gegen N`=increase_XX'_t_placebo_`i'_g_XX = total(dist_to_switch_pl_`i'_wXX) ///
+        , by(time_XX d_sq_XX `trends_nonparam')
 
 ///// Creating all the adjustment terms to compute estimators with controls, and their variances 
 if "`controls'" != ""{
@@ -5516,7 +5626,9 @@ foreach l of local levels_d_sq_XX { // index l corresponds to d in the paper
 capture drop m`=increase_XX'_pl_g_`count_controls'_`l'_`i'_XX 
 gen m`=increase_XX'_pl_g_`count_controls'_`l'_`i'_XX = (`i' <= T_g_XX-2 & d_sq_int_XX == `l')* (G_XX / N`=increase_XX'_placebo_`i'_XX) * ([dist_to_switch_pl_`i'_XX - (N`=increase_XX'_t_placebo_`i'_g_XX/N_gt_control_placebo_`i'_XX) * never_change_d_pl_`i'_XX] * (time_XX>=`=`i'+1'&time_XX<=T_g_XX) * diff_X`count_controls'_pl_`i'_N_XX)
 capture drop m_pl`=increase_XX'_`l'_`count_controls'_`i'_XX
-bys group_XX: gegen m_pl`=increase_XX'_`l'_`count_controls'_`i'_XX=total(m`=increase_XX'_pl_g_`count_controls'_`l'_`i'_XX)
+gegen m_pl`=increase_XX'_`l'_`count_controls'_`i'_XX = ///
+        total(m`=increase_XX'_pl_g_`count_controls'_`l'_`i'_XX) ///
+        , by(group_XX)
 bys group_XX: replace m_pl`=increase_XX'_`l'_`count_controls'_`i'_XX = . if _n != 1
 capture drop M_pl`=increase_XX'_`l'_`count_controls'_`i'_XX 
 egen M_pl`=increase_XX'_`l'_`count_controls'_`i'_XX = total(m_pl`=increase_XX'_`l'_`count_controls'_`i'_XX)
@@ -5555,10 +5667,13 @@ gen dof_s_pl_`i'_XX = N_gt_XX!=0&dist_to_switch_pl_`i'_XX==1
 
 // Modif Clément: we need to add by time
 * Mean's denominator
-bys d_sq_XX `trends_nonparam' time_XX : gegen count_cohort_pl_`i'_ns_t_XX=total(N_gt_XX) if dof_ns_pl_`i'_XX == 1
+gegen count_cohort_pl_`i'_ns_t_XX = total(N_gt_XX) if dof_ns_pl_`i'_XX == 1 ///
+        , by(d_sq_XX `trends_nonparam' time_XX)
 
 * Mean's numerator
-bys d_sq_XX `trends_nonparam' time_XX : gegen total_cohort_pl_`i'_ns_t_XX=total(diff_y_pl_`i'_N_gt_XX) if dof_ns_pl_`i'_XX == 1
+gegen total_cohort_pl_`i'_ns_t_XX = total(diff_y_pl_`i'_N_gt_XX) if ///
+        dof_ns_pl_`i'_XX == 1 ///
+        , by(d_sq_XX `trends_nonparam' time_XX)
 
 * Mean 
 gen mean_cohort_pl_`i'_ns_t_XX=total_cohort_pl_`i'_ns_t_XX/count_cohort_pl_`i'_ns_t_XX
@@ -5566,12 +5681,17 @@ gen mean_cohort_pl_`i'_ns_t_XX=total_cohort_pl_`i'_ns_t_XX/count_cohort_pl_`i'_n
 * Counting number of groups for DOF adjustment
 {
 	if "`cluster'" == "" {
-		bys d_sq_XX `trends_nonparam' time_XX : gegen dof_cohort_pl_`i'_ns_t_XX=total(dof_ns_pl_`i'_XX) if dof_ns_pl_`i'_XX == 1
+                gegen dof_cohort_pl_`i'_ns_t_XX = total(dof_ns_pl_`i'_XX) if ///
+                        dof_ns_pl_`i'_XX == 1 ///
+                        , by(d_sq_XX `trends_nonparam' time_XX)
 	}
 	else {
 		cap drop cluster_dof_pl_`i'_ns_XX
 		gen cluster_dof_pl_`i'_ns_XX = `cluster' if dof_ns_pl_`i'_XX == 1
-		bys d_sq_XX `trends_nonparam' time_XX: gegen dof_cohort_pl_`i'_ns_t_XX = nunique(cluster_dof_pl_`i'_ns_XX) if !missing(cluster_dof_pl_`i'_ns_XX)
+                gegen dof_cohort_pl_`i'_ns_t_XX = ///
+                        nunique(cluster_dof_pl_`i'_ns_XX) if ///
+                        !missing(cluster_dof_pl_`i'_ns_XX) ///
+                        , by(d_sq_XX `trends_nonparam' time_XX)
 	}
 }
 // End modif Clément
@@ -5581,10 +5701,13 @@ gen mean_cohort_pl_`i'_ns_t_XX=total_cohort_pl_`i'_ns_t_XX/count_cohort_pl_`i'_n
 // cohorts defined by D_{g,1}, F_g, D_{g,F_g}, `trends_nonparam' (\mathcal{C}_k in companion paper).
 
 * Mean's denominator
-bys d_sq_XX F_g_XX d_fg_XX `trends_nonparam' : gegen count_cohort_pl_`i'_s_t_XX=total(N_gt_XX) if dof_s_pl_`i'_XX==1
+gegen count_cohort_pl_`i'_s_t_XX = total(N_gt_XX) if dof_s_pl_`i'_XX == 1 ///
+        , by(d_sq_XX F_g_XX d_fg_XX `trends_nonparam')
 
 * Mean's numerator
-bys d_sq_XX F_g_XX d_fg_XX `trends_nonparam' : gegen total_cohort_pl_`i'_s_t_XX=total(diff_y_pl_`i'_N_gt_XX) if dof_s_pl_`i'_XX==1 
+gegen total_cohort_pl_`i'_s_t_XX = total(diff_y_pl_`i'_N_gt_XX) if ///
+        dof_s_pl_`i'_XX == 1 ///
+        , by(d_sq_XX F_g_XX d_fg_XX `trends_nonparam')
 
 * Mean 
 gen mean_cohort_pl_`i'_s_t_XX=total_cohort_pl_`i'_s_t_XX/count_cohort_pl_`i'_s_t_XX	
@@ -5592,12 +5715,17 @@ gen mean_cohort_pl_`i'_s_t_XX=total_cohort_pl_`i'_s_t_XX/count_cohort_pl_`i'_s_t
 * Counting number of groups for DOF adjustment
 {
 	if "`cluster'" == "" {
-		bys d_sq_XX F_g_XX d_fg_XX `trends_nonparam' : gegen dof_cohort_pl_`i'_s_t_XX=total(dof_s_pl_`i'_XX) if dof_s_pl_`i'_XX==1
+                gegen dof_cohort_pl_`i'_s_t_XX = total(dof_s_pl_`i'_XX) if ///
+                        dof_s_pl_`i'_XX == 1 ///
+                        , by(d_sq_XX F_g_XX d_fg_XX `trends_nonparam')
 	}
 	else {
 		cap drop cluster_dof_pl_`i'_s_XX
 		gen cluster_dof_pl_`i'_s_XX = `cluster' if dof_s_pl_`i'_XX == 1
-		bys d_sq_XX F_g_XX d_fg_XX `trends_nonparam': gegen dof_cohort_pl_`i'_s_t_XX = nunique(cluster_dof_pl_`i'_s_XX) if !missing(cluster_dof_pl_`i'_s_XX)
+                gegen dof_cohort_pl_`i'_s_t_XX = ///
+                        nunique(cluster_dof_pl_`i'_s_XX) if ///
+                        !missing(cluster_dof_pl_`i'_s_XX) ///
+                        , by(d_sq_XX F_g_XX d_fg_XX `trends_nonparam')
 	}
 }
 
@@ -5613,10 +5741,14 @@ cap drop dof_cohort_pl_`i'_ns_s_t_XX
 gen dof_ns_s_pl_`i'_XX=(dof_s_pl_`i'_XX==1|dof_ns_pl_`i'_XX ==1)
 
 * Mean's denominator
-bys d_sq_XX `trends_nonparam' time_XX : gegen count_cohort_pl_`i'_ns_s_t_XX=total(N_gt_XX) if dof_ns_s_pl_`i'_XX==1
+gegen count_cohort_pl_`i'_ns_s_t_XX = total(N_gt_XX) if dof_ns_s_pl_`i'_XX ///
+        == 1 ///
+        , by(d_sq_XX `trends_nonparam' time_XX)
 
 * Mean's numerator
-bys d_sq_XX `trends_nonparam' time_XX: gegen total_cohort_pl_`i'_ns_s_t_XX=total(diff_y_pl_`i'_N_gt_XX) if dof_ns_s_pl_`i'_XX==1
+gegen total_cohort_pl_`i'_ns_s_t_XX = total(diff_y_pl_`i'_N_gt_XX) if ///
+        dof_ns_s_pl_`i'_XX == 1 ///
+        , by(d_sq_XX `trends_nonparam' time_XX)
 
 * Mean 
 gen mean_cohort_pl_`i'_ns_s_t_XX=total_cohort_pl_`i'_ns_s_t_XX/count_cohort_pl_`i'_ns_s_t_XX
@@ -5624,12 +5756,17 @@ gen mean_cohort_pl_`i'_ns_s_t_XX=total_cohort_pl_`i'_ns_s_t_XX/count_cohort_pl_`
 * Counting number of groups for DOF adjustment
 {
 	if "`cluster'" == "" {
-		bys d_sq_XX `trends_nonparam' time_XX: gegen dof_cohort_pl_`i'_ns_s_t_XX=total(dof_ns_s_pl_`i'_XX) if dof_ns_s_pl_`i'_XX==1
+                gegen dof_cohort_pl_`i'_ns_s_t_XX = ///
+                        total(dof_ns_s_pl_`i'_XX) if dof_ns_s_pl_`i'_XX == 1 ///
+                        , by(d_sq_XX `trends_nonparam' time_XX)
 	}
 	else {
 		cap drop cluster_dof_pl_`i'_ns_s_XX
 		gen cluster_dof_pl_`i'_ns_s_XX = `cluster' if dof_ns_s_pl_`i'_XX==1
-		bys d_sq_XX `trends_nonparam' time_XX: gegen dof_cohort_pl_`i'_ns_s_t_XX = nunique(cluster_dof_pl_`i'_ns_s_XX) if !missing(cluster_dof_pl_`i'_ns_s_XX)
+                gegen dof_cohort_pl_`i'_ns_s_t_XX = ///
+                        nunique(cluster_dof_pl_`i'_ns_s_XX) if ///
+                        !missing(cluster_dof_pl_`i'_ns_s_XX) ///
+                        , by(d_sq_XX `trends_nonparam' time_XX)
 	}
 }	
 
@@ -5658,7 +5795,8 @@ if (N`=increase_XX'_placebo_`i'_XX!=0){
 
 gen U_Gg_pl_`i'_temp_XX = dummy_U_Gg_pl_`i'_XX*(G_XX / N`=increase_XX'_placebo_`i'_XX) * (time_XX>=`=`i'+1'&time_XX<=T_g_XX)* N_gt_XX * [dist_to_switch_pl_`i'_XX - (N`=increase_XX'_t_placebo_`i'_g_XX/N_gt_control_placebo_`i'_XX) * never_change_d_pl_`i'_XX] *diff_y_pl_`i'_XX 
 
-bysort group_XX : gegen U_Gg_placebo_`i'_XX=total(U_Gg_pl_`i'_temp_XX)
+gegen U_Gg_placebo_`i'_XX = total(U_Gg_pl_`i'_temp_XX) ///
+        , by(group_XX)
 
 replace U_Gg_placebo_`i'_XX= U_Gg_placebo_`i'_XX*first_obs_by_gp_XX
 
@@ -5703,7 +5841,8 @@ replace part2_pl_switch`=increase_XX'_`i'_XX=part2_pl_switch`=increase_XX'_`i'_X
 
 }	
 
-bys group_XX: gegen U_Gg_pl_`i'_var_XX=total(U_Gg_pl_`i'_temp_var_XX)
+gegen U_Gg_pl_`i'_var_XX = total(U_Gg_pl_`i'_temp_var_XX) ///
+        , by(group_XX)
 
 // Modeif Felix 21.03.2025 (adjust order of adding additional term and summing across t)
 if "`controls'"!=""{
@@ -5728,11 +5867,17 @@ if "`normalized'"!=""{
 	capture drop delta_D_pl_`i'_cum_temp_XX
 
 	if `continuous'==0{
-	bys group_XX : gegen sum_treat_until_`i'_pl_XX = total(treatment_XX - d_sq_XX) if time_XX>=F_g_XX&time_XX<=F_g_XX-1+`i'& S_g_XX==increase_XX
+        gegen sum_treat_until_`i'_pl_XX = total(treatment_XX - d_sq_XX) if ///
+                time_XX >= F_g_XX & time_XX <= F_g_XX - 1 + `i' & S_g_XX == ///
+                increase_XX ///
+                , by(group_XX)
 	} // FELIX 18.03.2025 (delete the diff_y_pl_`i'_XX!=. condition)
 
 	else if `continuous'>0{
-		bys group_XX : gegen sum_treat_until_`i'_pl_XX = total(treatment_XX_orig - d_sq_XX_orig) if time_XX>=F_g_XX&time_XX<=F_g_XX-1+`i'&S_g_XX==increase_XX
+                gegen sum_treat_until_`i'_pl_XX = total(treatment_XX_orig - ///
+                        d_sq_XX_orig) if time_XX >= F_g_XX & time_XX <= ///
+                        F_g_XX - 1 + `i' & S_g_XX == increase_XX ///
+                        , by(group_XX)
 	} // FELIX 18.03.2025 (delete the diff_y_pl_`i'_XX!=. condition)
 
 gen delta_D_pl_`i'_cum_temp_XX = N_gt_XX/N`=increase_XX'_placebo_`i'_XX*[sum_treat_until_`i'_pl_XX* S_g_XX + (1-S_g_XX)*(-sum_treat_until_`i'_pl_XX)] if dist_to_switch_pl_`i'_XX==1
