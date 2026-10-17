@@ -302,5 +302,23 @@
     "prep": "",
     "benchmark": true,
     "timed": true
+  },
+  {
+    "name": "stress_1000",
+    "data": "stress_1000",
+    "options": "effects(1) placebo(0) cluster(cluster)",
+    "prep": "",
+    "benchmark": true,
+    "timed": true,
+    "stress_dates": 1000
+  },
+  {
+    "name": "stress_3000",
+    "data": "stress_3000",
+    "options": "effects(1) placebo(0) cluster(cluster)",
+    "prep": "",
+    "benchmark": true,
+    "timed": true,
+    "stress_dates": 3000
   }
 ]

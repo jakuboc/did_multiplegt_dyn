@@ -1,8 +1,8 @@
 Stata performance regression tests
 
 Requirements
-  Licensed Stata 16 or newer, installed gtools, Python 3 standard library,
-  and Git. The production command keeps its existing version 12.0 target;
+  Licensed Stata/SE or Stata/MP 16 or newer, installed gtools, Python 3.8+
+  (standard library only), and Git. The command keeps its version 12.0 target;
   only Stata/MP 16.1 was executed for this contribution.
 
 From the repository root, set STATA_BIN to the Stata executable, then run:
@@ -68,3 +68,19 @@ Results are synthetic-data validation, not a proof for every dataset or
 option combination. Graph rendering and external design/date exports are
 not exhaustively compared. The separate unavailable-horizon reset failure
 is not counted as a successful estimation or included in timing medians.
+
+For the Mata helper precision checks, run in Stata from the repository root:
+  do Stata/tests/performance/helper_checks.do Stata/did_multiplegt_dyn.ado
+A successful run prints HELPER_CHECKS_PASSED.
+
+Optional long-calendar stress tests (one effect, no placebos):
+  python3 Stata/tests/performance/run.py --base upstream/main \
+      --stress-dates 1000 --cases stress_1000
+  python3 Stata/tests/performance/run.py --base upstream/main \
+      --stress-dates 3000 --cases stress_3000
+The 1,000-date case has 1,250 units, 1,040 periods, and 1.3 million rows.
+The 3,000-date case has 3,750 units, 3,040 periods, and 11.4 million rows.
+These optional cases are excluded from --benchmarks unless explicitly
+selected with --stress-dates. Upstream fills the complete group/time grid,
+so shortening unit-specific observation windows would not avoid that
+internal expansion. The 3,000-date baseline can take tens of minutes.

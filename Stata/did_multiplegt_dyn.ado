@@ -2731,45 +2731,9 @@ if "`cluster'"!=""{
 replace first_obs_by_gp_XX=first_obs_by_clust_XX
 }
 
-forvalue i=1/`total_num_estimates_XX'{
-		
-		// Fill the diagonal with the Variances
-		matrix didmgt_Var_all_XX[`i',`i']= scalar(se_all_`i'_XX)^2
-	
-		// Fill off diagonal with covariances
-		if `i'<`total_num_estimates_XX'{
-		forvalue j=`=`i'+1'/`total_num_estimates_XX'{
-			
-			* Create variables necessary to compute the covariances
-			capture drop U_Gg_var_comb_`i'_`j'_XX
-			capture drop U_Gg_var_comb_`i'_`j'_2_XX
-					
-			if ("`normalized'"==""){
-			gen U_Gg_var_comb_`i'_`j'_XX = U_Gg_var_comb_`i'_XX + U_Gg_var_comb_`j'_XX
-		}
-			
-			// Also need adjusted delta_D for all effects!!!
-			if "`normalized'"!=""{
-			gen U_Gg_var_comb_`i'_`j'_XX = U_Gg_var_comb_`i'_XX/scalar(delta_D_all_`i'_XX) + U_Gg_var_comb_`j'_XX/scalar(delta_D_all_`j'_XX)
-		}
-
-			* Estimate the covariances
-			gen U_Gg_var_comb_`i'_`j'_2_XX = U_Gg_var_comb_`i'_`j'_XX^2*first_obs_by_gp_XX
-			
-			
-			sum U_Gg_var_comb_`i'_`j'_2_XX
-			scalar var_sum_comb_`i'_`j'_XX=r(sum)/G_XX^2
-			
-			scalar cov_comb_`i'_`j'_XX = (scalar(var_sum_comb_`i'_`j'_XX) - scalar(se_all_`i'_XX)^2 - scalar(se_all_`j'_XX)^2)/2
-	
-			* Store the results
-			matrix didmgt_Var_all_XX[`i',`j']= scalar(cov_comb_`i'_`j'_XX)
-			matrix didmgt_Var_all_XX[`j',`i']= scalar(cov_comb_`i'_`j'_XX)
-
-		}
-	}
-	
-}
+* Preserve the original float intermediates in the Mata calculation.
+_didmgt_dyn_vcov, matrix(didmgt_Var_all_XX) kind(combined) ///
+        first(1) last(`total_num_estimates_XX') `normalized'
 
 *** Modif Felix: replace by bootstrap var/cov matrix
 if `bootstrap_XX'!=0{
@@ -2821,44 +2785,13 @@ if (l_placebo_XX!=0)&l_placebo_XX>1{
 	// Creating a matrix where the variances and the covariances of the placebos will be stored.
 	matrix didmgt_Var_Placebo=J(l_placebo_XX,l_placebo_XX,0)
 	
-	// Fill those matrices
-	forvalue i=1/`=l_placebo_XX'{
-		
-		matrix didmgt_Placebo[`i',1]=scalar(DID_placebo_`i'_XX)
-		matrix didmgt_Var_Placebo[`i',`i']= scalar(se_placebo_`i'_XX)^2
-	
-		if `i'<`=l_placebo_XX'{
-		forvalue j=`=`i'+1'/`=l_placebo_XX'{
-			
-			* Create variables necessary to compute the covariances
-			capture drop U_Gg_var_pl_`i'_`j'_XX
-			capture drop U_Gg_var_pl_`i'_`j'_2_XX
-					
-			if ("`normalized'"==""){
-			gen U_Gg_var_pl_`i'_`j'_XX = U_Gg_var_glob_pl_`i'_XX + U_Gg_var_glob_pl_`j'_XX
-		}
-			
-			if "`normalized'"!=""{
-			gen U_Gg_var_pl_`i'_`j'_XX = U_Gg_var_glob_pl_`i'_XX/scalar(delta_D_pl_`i'_global_XX) + U_Gg_var_glob_pl_`j'_XX/scalar(delta_D_pl_`j'_global_XX)
-		}
+        forvalues i = 1/`=l_placebo_XX' {
+                matrix didmgt_Placebo[`i', 1] = scalar(DID_placebo_`i'_XX)
+        }
 
-			* Estimate the covariances
-			gen U_Gg_var_pl_`i'_`j'_2_XX = U_Gg_var_pl_`i'_`j'_XX^2*first_obs_by_gp_XX
-			
-			sum U_Gg_var_pl_`i'_`j'_2_XX
-			scalar var_sum_pla_`i'_`j'_XX=r(sum)/G_XX^2
-			
-			scalar cov_pl_`i'_`j'_XX = (scalar(var_sum_pla_`i'_`j'_XX) - scalar(se_placebo_`i'_XX)^2 - scalar(se_placebo_`j'_XX)^2)/2
-	
-			* Store the results
-			matrix didmgt_Var_Placebo[`i',`j']= scalar(cov_pl_`i'_`j'_XX)
-			matrix didmgt_Var_Placebo[`j',`i']= scalar(cov_pl_`i'_`j'_XX)
+        _didmgt_dyn_vcov, matrix(didmgt_Var_Placebo) kind(placebo) ///
+                first(1) last(`=l_placebo_XX') `normalized'
 
-		}
-	}
-	
-	}
-	
 	*** Modif Felix: replace matrix with bootstrap
 	if `bootstrap_XX'!=0{
 		matrix didmgt_Var_Placebo=bs_var_cov_XX["_bs_`=l_XX+1'".."_bs_`=l_XX+l_placebo_XX'","_bs_`=l_XX+1'".."_bs_`=l_XX+l_placebo_XX'"]
@@ -2934,44 +2867,13 @@ if l_XX>1{
 	// Creating a matrix where the variances and the covariances of the placebos will be stored.
 	matrix didmgt_Var_effects=J(l_XX,l_XX,0)
 	
-	// Fill those matrices
-	forvalue i=1/`=l_XX'{
-		
-		matrix didmgt_effects[`i',1]=scalar(DID_`i'_XX)
-		matrix didmgt_Var_effects[`i',`i']= scalar(se_`i'_XX)^2
-	
-		if `i'<`=l_XX'{
-		forvalue j=`=`i'+1'/`=l_XX'{
-			
-			* Create variables necessary to compute the covariances
-			capture drop U_Gg_var_`i'_`j'_XX
-			capture drop U_Gg_var_`i'_`j'_2_XX
-					
-			if ("`normalized'"==""){
-			gen U_Gg_var_`i'_`j'_XX = U_Gg_var_glob_`i'_XX + U_Gg_var_glob_`j'_XX
-		}
-			
-			if "`normalized'"!=""{
-			gen U_Gg_var_`i'_`j'_XX = U_Gg_var_glob_`i'_XX/scalar(delta_D_`i'_global_XX) + U_Gg_var_glob_`j'_XX/scalar(delta_D_`j'_global_XX)
-		}
+        forvalues i = 1/`=l_XX' {
+                matrix didmgt_effects[`i', 1] = scalar(DID_`i'_XX)
+        }
 
-			* Estimate the covariances
-			gen U_Gg_var_`i'_`j'_2_XX = U_Gg_var_`i'_`j'_XX^2*first_obs_by_gp_XX
-			
-			sum U_Gg_var_`i'_`j'_2_XX
-			scalar var_sum_`i'_`j'_XX=r(sum)/G_XX^2
-			
-			scalar cov_`i'_`j'_XX = (scalar(var_sum_`i'_`j'_XX) - scalar(se_`i'_XX)^2 - scalar(se_`j'_XX)^2)/2
-	
-			* Store the results
-			matrix didmgt_Var_effects[`i',`j']= scalar(cov_`i'_`j'_XX)
-			matrix didmgt_Var_effects[`j',`i']= scalar(cov_`i'_`j'_XX)
+        _didmgt_dyn_vcov, matrix(didmgt_Var_effects) kind(effect) ///
+                first(1) last(`=l_XX') `normalized'
 
-		}
-	}
-	
-	}
-	
 	*** Modif Felix: replace matrix with bootstrap
 	if `bootstrap_XX'!=0{
 		matrix didmgt_Var_eff=bs_var_cov_XX["_bs_`=1'".."_bs_`=l_XX'","_bs_`=1'".."_bs_`=l_XX'"]
@@ -3096,59 +2998,13 @@ if `ee_called' == 1 & l_XX>1 {
 		* Create a partial identity matrix. 
 		matrix didmgt_identity = J(`=`length'-1', `length',0 )  
 		
-		* loop over each dyn effects of interest
-		
-		forvalue i=`ee_lb'/`ee_ub'{
-		
-			* condition on sufficient obs for this dyn effect
-			if ("`switchers'"==""&(N1_`i'_XX_new!=0|N0_`i'_XX_new!=0))|("`switchers'"=="out"&N0_`i'_XX_new!=0)|("`switchers'"=="in"&N1_`i'_XX_new!=0){
-				
-				* Location tracking in the sub matrices j:submatrix, i:full matrix. 
-				local j=`i'-`ee_lb'+1
-				
-				* Update diagonal elements of didmgt_Var Effects
-				matrix didmgt_Var_Effects[`j',`j']=scalar(se_`i'_XX)^2
-				* Update diagonal element of the identity matrix for matrix of demeaned effects
-				if `i' < `ee_ub'{
-					matrix didmgt_identity[`j',`j']=1
-				}
-				
-				* Update the variance-covariance matrix of selected effects
-				if `i' < `ee_ub'{
+                forvalues j = 1/`=`length' - 1' {
+                        matrix didmgt_identity[`j', `j'] = 1
+                }
 
-					/* Nested loop iterate over rest periods to be paired with i from i+1 to upper bound */
-					forvalue k=`=`i'+1'/`=`ee_ub''{ 
-						
-						* Location tracking in the sub matrices s:submatrix, k:full matrix. 
-						local s=`k'-`ee_lb'+1
-						
-						capture drop U_Gg_var_`i'_`k'_XX
-						capture drop U_Gg_var_`i'_`k'_2_XX	
-						
-						if ("`normalized'"==""){
-							gen U_Gg_var_`i'_`k'_XX = U_Gg_var_glob_`i'_XX+ U_Gg_var_glob_`k'_XX
-						}
-						if "`normalized'"!=""{
-							gen U_Gg_var_`i'_`k'_XX = U_Gg_var_glob_`i'_XX/scalar(delta_D_`i'_global_XX) + U_Gg_var_glob_`k'_XX/scalar(delta_D_`k'_global_XX)
-						}
-						
-						gen U_Gg_var_`i'_`k'_2_XX = U_Gg_var_`i'_`k'_XX^2*first_obs_by_gp_XX
+                _didmgt_dyn_vcov, matrix(didmgt_Var_Effects) kind(effect) ///
+                        first(`ee_lb') last(`ee_ub') `normalized'
 
-						sum U_Gg_var_`i'_`k'_2_XX
-						scalar var_sum_`i'_`k'_XX=r(sum)/G_XX^2
-						scalar cov_`i'_`k'_XX = (scalar(var_sum_`i'_`k'_XX) - scalar(se_`i'_XX)^2 - scalar(se_`k'_XX)^2)/2
-							
-						* Update covariance of i,k pair in submatrix
-						matrix didmgt_Var_Effects[`j',`s']= scalar(cov_`i'_`k'_XX)
-						matrix didmgt_Var_Effects[`s',`j']= scalar(cov_`i'_`k'_XX)
-						
-					}
-				/* End nested loop */ 
-				}
-				}
-				}
-				
-				
  		if `bootstrap_XX'!=0{
  			matrix didmgt_Var_Effects=bs_var_cov_XX["_bs_1".."_bs_`=l_XX'","_bs_1".."_bs_`=l_XX'"]
 			matrix didmgt_Var_Effects = didmgt_Var_Effects[`ee_lb'..`ee_ub', `ee_lb'..`ee_ub']
@@ -6027,5 +5883,109 @@ void _didmgt_dyn_time_total(string scalar variable, string scalar target)
         }
 
         st_numscalar(target, total)
+}
+end
+
+
+capture program drop _didmgt_dyn_vcov
+*! 1.0.0 jakuboc 17oct2026
+program define _didmgt_dyn_vcov
+        version 12.0
+        syntax, Matrix(name) Kind(string) First(integer) Last(integer) ///
+                [NORMALIZED]
+
+        local storage : set type
+        local variables
+        local ses
+        local denominators
+
+        forvalues i = `first'/`last' {
+                if "`kind'" == "combined" {
+                        local variable U_Gg_var_comb_`i'_XX
+                        local se se_all_`i'_XX
+                        local denominator delta_D_all_`i'_XX
+                }
+                else if "`kind'" == "placebo" {
+                        local variable U_Gg_var_glob_pl_`i'_XX
+                        local se se_placebo_`i'_XX
+                        local denominator delta_D_pl_`i'_global_XX
+                }
+                else {
+                        local variable U_Gg_var_glob_`i'_XX
+                        local se se_`i'_XX
+                        local denominator delta_D_`i'_global_XX
+                }
+
+                local variables `variables' `variable'
+                local ses `ses' `se'
+
+                if "`normalized'" != "" {
+                        local denominators `denominators' `denominator'
+                }
+        }
+
+        mata: _didmgt_dyn_covariance(st_local("variables"), st_local("ses"), ///
+                st_local("denominators"), st_local("matrix"), ///
+                st_local("storage"))
+end
+
+capture mata: mata drop _didmgt_dyn_covariance()
+
+version 12.0
+mata:
+void _didmgt_dyn_covariance(string scalar variables, string scalar ses,
+        string scalar denominators, string scalar target,
+        string scalar storage)
+{
+        real matrix values, covariance
+        real rowvector se, denominator
+        real colvector pair, squared
+        string rowvector se_names, denominator_names
+        real scalar i, j, k, groups, combined_variance
+
+        /*
+        Unselected rows contribute zero to the original sum. Read just
+        one observation per group (or cluster) and avoid dataset-wide
+        temporary variables for every pair. Reproduce BOTH storage
+        roundings from generate; a cross-product changes the results.
+        */
+        values = st_data(., tokens(variables), "first_obs_by_gp_XX")
+        se_names = tokens(ses)
+        denominator_names = tokens(denominators)
+        k = cols(values)
+        se = denominator = J(1, k, 1)
+        groups = st_numscalar("G_XX")
+
+        for (i = 1; i <= k; i++) {
+                se[i] = st_numscalar(se_names[i])
+
+                if (cols(denominator_names)) {
+                        denominator[i] =
+                                st_numscalar(denominator_names[i])
+                }
+        }
+
+        covariance = diag(se:^2)
+
+        for (i = 1; i <= k; i++) {
+                for (j = i + 1; j <= k; j++) {
+                        pair = values[, i] / denominator[i] +
+                                values[, j] / denominator[j]
+
+                        if (storage == "float") pair = floatround(pair)
+
+                        squared = pair:^2
+                        if (storage == "float") {
+                                squared = floatround(squared)
+                        }
+
+                        combined_variance = quadsum(squared) / groups^2
+                        covariance[i, j] =
+                                (combined_variance - se[i]^2 - se[j]^2)/2
+                        covariance[j, i] = covariance[i, j]
+                }
+        }
+
+        st_matrix(target, covariance)
 }
 end

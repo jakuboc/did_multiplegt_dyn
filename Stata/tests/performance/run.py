@@ -13,9 +13,9 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[2]
 
 
-def stata(executable, dofile, folder, *arguments):
+def stata(executable, dofile, folder, *arguments, timeout=1200):
     subprocess.run([executable, '-bq', 'do', str(dofile), *map(str, arguments)],
-                   cwd=folder, timeout=1200, check=True)
+                   cwd=folder, timeout=timeout, check=True)
 
 
 def compare(left, right):
@@ -83,7 +83,8 @@ exit, clear
 '''
     dofile = folder / 'estimate.do'
     dofile.write_text(code)
-    stata(executable, dofile, folder)
+    stata(executable, dofile, folder,
+          timeout=7200 if case.get('stress_dates') == 3000 else 1200)
     if not (folder / 'success').exists():
         raise RuntimeError(f'{case["name"]}/{variant}: see {folder}/estimate.log')
     seconds = float((folder / 'time.txt').read_text().split()[0])
@@ -114,6 +115,7 @@ def main():
     parser.add_argument('--stata', default=os.environ.get('STATA_BIN', 'stata-mp'))
     parser.add_argument('--base', default='upstream/main')
     parser.add_argument('--benchmarks', action='store_true')
+    parser.add_argument('--stress-dates', type=int, choices=[1000, 3000])
     parser.add_argument('--repetitions', type=int, default=1)
     parser.add_argument('--cases', nargs='+')
     parser.add_argument('--output', type=Path, default=HERE / '.artifacts')
@@ -133,16 +135,21 @@ def main():
     baseline.write_bytes(original)
     candidate = REPO / 'Stata/did_multiplegt_dyn.ado'
     cases = json.loads((HERE / 'cases.json').read_text())
-    cases = [c for c in cases if (args.benchmarks or not c['benchmark']) and
+    cases = [c for c in cases if
+             (c.get('stress_dates') == args.stress_dates if c.get('stress_dates')
+              else args.benchmarks or not c['benchmark']) and
              (not args.cases or c['name'] in args.cases)]
     if not cases:
         parser.error('No matching scenarios.')
     setup = output / 'setup.do'
     generators = ['reversals.do', 'small.do']
-    if any(c['benchmark'] for c in cases):
+    if any(c['benchmark'] and not c.get('stress_dates') for c in cases):
         generators.append('staggered.do')
     setup.write_text('\n'.join(f'do "{HERE / name}" "{data}"'
-                               for name in generators) + '\nexit, clear\n')
+                               for name in generators) + '\n' +
+                     (f'do "{HERE}/stress.do" "{data}" {args.stress_dates}\n'
+                      if any(c.get('stress_dates') for c in cases) else '') +
+                     'exit, clear\n')
     stata(executable, setup, output)
     for case in cases:
         if not (data / (case['data'] + '.dta')).exists():
