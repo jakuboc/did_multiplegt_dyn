@@ -4800,71 +4800,79 @@ capture drop still_switcher_`i'_XX
 sort group_XX time_XX
 
 // Modif. Diego 31-03-2025: long-difference and other variables to tailor distance_to_switch to the groups for which the all the effects can be computed
-cap drop N_g_control_check_XX
-gen N_g_control_check_XX = 0
+* Eligibility is constant across horizons within this core call.
+if `i' == 1 {
+        cap drop N_g_control_check_XX
+        gen N_g_control_check_XX = 0
 
-forv j = 1/`=`effects'' {
-	cap drop diff_y_last_XX
-	cap drop never_change_d_last_XX
-	cap drop never_change_d_last_wXX
-	cap drop N_gt_control_last_XX
-	cap drop N_g_control_last_temp_XX
-	cap drop N_g_control_last_m_XX
-	cap drop diff_y_relev_temp_XX
-	cap drop diff_y_relev_XX
+        forv j = 1/`=`effects'' {
+                cap drop diff_y_last_XX
+                cap drop never_change_d_last_XX
+                cap drop never_change_d_last_wXX
+                cap drop N_gt_control_last_XX
+                cap drop N_g_control_last_temp_XX
+                cap drop N_g_control_last_m_XX
+                cap drop diff_y_relev_temp_XX
+                cap drop diff_y_relev_XX
 
-	xtset group_XX time_XX
-	bys group_XX : gen diff_y_last_XX = outcome_XX - L`j'.outcome_XX
-	bys group_XX: gen never_change_d_last_XX=(F_g_XX>time_XX) if diff_y_last_XX!=.
-	if "`only_never_switchers'" != "" {
-		replace never_change_d_last_XX = 0 if F_g_XX > time_XX & F_g_XX < T_max_XX + 1 & diff_y_last_XX != .
-	}
-	gen never_change_d_last_wXX = never_change_d_last_XX*N_gt_XX
-        gegen N_gt_control_last_XX = total(never_change_d_last_wXX) ///
-                , by(time_XX d_sq_XX `trends_nonparam')
+                xtset group_XX time_XX
+                bys group_XX : gen diff_y_last_XX = outcome_XX - L`j'.outcome_XX
+                bys group_XX: gen never_change_d_last_XX=(F_g_XX>time_XX) if diff_y_last_XX!=.
+                if "`only_never_switchers'" != "" {
+                        replace never_change_d_last_XX = 0 if F_g_XX > time_XX & F_g_XX < T_max_XX + 1 & diff_y_last_XX != .
+                }
+                gen never_change_d_last_wXX = never_change_d_last_XX*N_gt_XX
+                gegen N_gt_control_last_XX = total(never_change_d_last_wXX) ///
+                        , by(time_XX d_sq_XX `trends_nonparam')
 
-	gen N_g_control_last_temp_XX = N_gt_control_last_XX if time_XX == F_g_XX - 1 + `j'
-	bys group_XX: egen N_g_control_last_m_XX = mean(N_g_control_last_temp_XX)
+                gen N_g_control_last_temp_XX = N_gt_control_last_XX if time_XX == F_g_XX - 1 + `j'
+                bys group_XX: egen N_g_control_last_m_XX = mean(N_g_control_last_temp_XX)
 
-	gen diff_y_relev_temp_XX = diff_y_last_XX if time_XX == F_g_XX - 1 + `j'
-	bys group_XX: egen diff_y_relev_XX = mean(diff_y_relev_temp_XX)
+                gen diff_y_relev_temp_XX = diff_y_last_XX if time_XX == F_g_XX - 1 + `j'
+                bys group_XX: egen diff_y_relev_XX = mean(diff_y_relev_temp_XX)
 
-	replace N_g_control_check_XX = N_g_control_check_XX + (N_g_control_last_m_XX > 0 & diff_y_relev_XX != .)
+                replace N_g_control_check_XX = N_g_control_check_XX + (N_g_control_last_m_XX > 0 & diff_y_relev_XX != .)
+        }
+
 }
 
 * If the same_switchers_pl option is specified:
 
 if ("`same_switchers_pl'"!=""){
-cap drop N_g_control_check_pl_XX
-gen N_g_control_check_pl_XX = 0
-forv j = 1/`=`placebo'' {
-	cap drop diff_y_last_XX
-	cap drop never_change_d_last_XX
-	cap drop never_change_d_last_wXX
-	cap drop N_gt_control_last_XX
-	cap drop N_g_control_last_temp_XX
-	cap drop N_g_control_last_m_XX
-	cap drop diff_y_relev_temp_XX
-	cap drop diff_y_relev_XX
+* Eligibility is constant across horizons within this core call.
+if `i' == 1 {
+        cap drop N_g_control_check_pl_XX
+        gen N_g_control_check_pl_XX = 0
+        forv j = 1/`=`placebo'' {
+                cap drop diff_y_last_XX
+                cap drop never_change_d_last_XX
+                cap drop never_change_d_last_wXX
+                cap drop N_gt_control_last_XX
+                cap drop N_g_control_last_temp_XX
+                cap drop N_g_control_last_m_XX
+                cap drop diff_y_relev_temp_XX
+                cap drop diff_y_relev_XX
 
-	xtset group_XX time_XX
-	bys group_XX : gen diff_y_last_XX = outcome_XX - F`j'.outcome_XX
-	bys group_XX: gen never_change_d_last_XX=(F_g_XX>time_XX) if diff_y_last_XX!=.
-	if "`only_never_switchers'" != "" {
-		replace never_change_d_last_XX = 0 if F_g_XX > time_XX & F_g_XX < T_max_XX + 1 & diff_y_last_XX != .
-	}
-	gen never_change_d_last_wXX = never_change_d_last_XX*N_gt_XX
-        gegen N_gt_control_last_XX = total(never_change_d_last_wXX) ///
-                , by(time_XX d_sq_XX `trends_nonparam')
+                xtset group_XX time_XX
+                bys group_XX : gen diff_y_last_XX = outcome_XX - F`j'.outcome_XX
+                bys group_XX: gen never_change_d_last_XX=(F_g_XX>time_XX) if diff_y_last_XX!=.
+                if "`only_never_switchers'" != "" {
+                        replace never_change_d_last_XX = 0 if F_g_XX > time_XX & F_g_XX < T_max_XX + 1 & diff_y_last_XX != .
+                }
+                gen never_change_d_last_wXX = never_change_d_last_XX*N_gt_XX
+                gegen N_gt_control_last_XX = total(never_change_d_last_wXX) ///
+                        , by(time_XX d_sq_XX `trends_nonparam')
 
-	gen N_g_control_last_temp_XX = N_gt_control_last_XX if time_XX == F_g_XX - 1 - `j'
-	bys group_XX: egen N_g_control_last_m_XX = mean(N_g_control_last_temp_XX)
+                gen N_g_control_last_temp_XX = N_gt_control_last_XX if time_XX == F_g_XX - 1 - `j'
+                bys group_XX: egen N_g_control_last_m_XX = mean(N_g_control_last_temp_XX)
 
-	gen diff_y_relev_temp_XX = diff_y_last_XX if time_XX == F_g_XX - 1 - `j'
-	bys group_XX: egen diff_y_relev_XX = mean(diff_y_relev_temp_XX)
+                gen diff_y_relev_temp_XX = diff_y_last_XX if time_XX == F_g_XX - 1 - `j'
+                bys group_XX: egen diff_y_relev_XX = mean(diff_y_relev_temp_XX)
 
-	replace N_g_control_check_pl_XX = N_g_control_check_pl_XX + (N_g_control_last_m_XX > 0 & diff_y_relev_XX != .)
+                replace N_g_control_check_pl_XX = N_g_control_check_pl_XX + (N_g_control_last_m_XX > 0 & diff_y_relev_XX != .)
+        }
 }
+
 * Generate a variable tagging the switchers that should be dropped
 * Is the case if at least one of the placebos or effects we try to estimate is missing:
 gen relevant_y_missing_XX=(outcome_XX==.&time_XX>=F_g_XX-1-`=`placebo''&time_XX<=F_g_XX-1+`=`effects'') 
